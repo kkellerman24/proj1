@@ -11,9 +11,6 @@ enum thread_status
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
-	// NEW CODE
-	THREAD_SLEEPING, 	// Sleeping until number of ticks have passed
-	// END NEW CODE
     THREAD_DYING        /* About to be destroyed. */
   };
 
@@ -142,5 +139,10 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+// NEW CODE
+bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 
 #endif /* threads/thread.h */

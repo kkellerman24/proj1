@@ -28,9 +28,6 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
-// NEW CODE
-static struct list sleeping_list;
-
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -95,9 +92,6 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  // NEW CODE
-  list_init (&sleeping_list);
-  // END NEW CODE
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -226,44 +220,6 @@ thread_block (void)
   schedule ();
 }
 
-// NEW CODE
-void 
-thread_sleep (int64_t ticks_to_sleep)
-{
-	struct thread *cur = thread_current ();
-	// interrupts or lock
-	// test for idle thread
-	if (cur == idle_thread)
-		return;
-		// also release lock? 
-	
-	list_insert_ordered(&sleeping_list, &cur->elem, (list_less_func *) &is_less_wake_time, NULL);
-	cur->status = THREAD_SLEEPING;
-	cur->wake_time = timer_ticks() + ticks_to_sleep;
-	schedule();
-	// interrupts or lock
-	
-}
-// END NEW CODE
-
-// NEW CODE
-void 
-test_wake_threads (void)
-{
-	int64_t cur_ticks = timer_ticks();
-	while(true)
-	{
-		if(list_empty(&sleeping_list))
-			return;
-		struct list_elem *index = list_front(&sleeping_list)
-		struct thread *t = list_entry(index, struct thread, elem);
-		if (t->wake_time > ticks)
-			return;
-		list_pop_front(&sleeping_list);
-		thread_unblock(t);
-	}
-}
-// END NEW CODE
 
 /* Transitions a blocked thread T to the ready-to-run state.
    This is an error if T is not blocked.  (Use thread_yield() to
@@ -290,10 +246,12 @@ thread_unblock (struct thread *t)
   
   // NEW CODE
   enum intr_level old_level;
-  ASSER (is_thread (t));
+  ASSERT (is_thread (t));
   old_level = intr_disable();
-  ASSERT (t->status == THREAD_BLOCKED || t->status == THREAD_SLEEPING);
-  list_insert_ordered(&ready_list, &cur->elem, (list_less_func *) &is_greater_priority, NULL);
+  ASSERT (t->status == THREAD_BLOCKED);
+  list_insert_ordered(&ready_list, &t->elem, (list_less_func *) &is_greater_priority, NULL);
+  t->status = THREAD_READY;
+  intr_set_level (old_level);
   // END NEW CODE
 }
 
@@ -395,12 +353,12 @@ thread_set_priority (int new_priority)
 {
   // thread_current ()->priority = new_priority;
   struct thread *cur = thread_current();
-  cur->priority = new_priority();
+  cur->priority = new_priority;
   if (list_empty (&ready_list))
      return;
 
-  struct list_elem *front_elem = list_front(&sleeping_list);
-  struct thread *front_ready_thread = list_entry(it, struct thread, elem);
+  struct list_elem *front_elem = list_front(&ready_list);
+  struct thread *front_ready_thread = list_entry(front_elem, struct thread, elem);
   if (front_ready_thread->priority > cur->priority)
 	  thread_yield();
 }
@@ -661,10 +619,3 @@ bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, 
 	return thread_a->priority > thread_b->priority;
 }
 
-bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
-{
-	struct thread *thread_a = list_entry(a, struct thread, elem);
-	struct thread *thread_b = list_entry(b, struct thread, elem);
-	
-	return thread_a->wake_time < thread_b->wake_time;
-}
