@@ -231,23 +231,13 @@ thread_block (void)
    update other data. */
 void
 thread_unblock (struct thread *t) 
-{
-  /*
-  enum intr_level old_level;
-
-  ASSERT (is_thread (t));
-
-  old_level = intr_disable ();
-  ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
-  t->status = THREAD_READY;
-  intr_set_level (old_level);
-  */
-  
+{  
   // NEW CODE
-  enum intr_level old_level;
+  /* Turn off interrupts temporarily */
+  /* Inserting our unblocked thread into the ready list so it may now be used to execute */
+  enum intr_level old_level; 
   ASSERT (is_thread (t));
-  old_level = intr_disable();
+  old_level = intr_disable(); 
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered(&ready_list, &t->elem, (list_less_func *) &is_greater_priority, NULL);
   t->status = THREAD_READY;
@@ -321,10 +311,14 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
+  {
 	  // NEW CODE
+      /* Inserting our unblocked thread into the ready list so it may now be used to execute */
 	  list_insert_ordered(&ready_list, &cur->elem, (list_less_func *) &is_greater_priority, NULL);
-    //list_push_back (&ready_list, &cur->elem);
-	// END NEW CODE
+	  //list_push_back (&ready_list, &cur->elem);
+	  // END NEW CODE
+  }
+	  
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -611,6 +605,7 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 // NEW CODE
+/* This is a helper function for determining priority in a list */
 bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
 	struct thread *thread_a = list_entry(a, struct thread, elem);
@@ -618,4 +613,16 @@ bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, 
 	
 	return thread_a->priority > thread_b->priority;
 }
+// END NEW CODE
+
+// NEW CODE
+/* This is a helper function for ordering our sleep list based on wake time */
+bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+	struct thread *thread_a = list_entry(a, struct thread, elem);
+	struct thread *thread_b = list_entry(b, struct thread, elem);
+	
+	return thread_a->wake_time < thread_b->wake_time;
+}
+// END NEW CODE
 

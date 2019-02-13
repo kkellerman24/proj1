@@ -90,7 +90,8 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 	// NEW CODE
-	int64_t wake_time;
+	int64_t wake_time;					/* keeps track of time, based on ticks, till the thread should be awoken */
+	// END NEW CODE
 	
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -141,8 +142,10 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 // NEW CODE
+/* Prototypes for functions that help order our sleeping threads by wake time */
 bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+// END NEW CODE
 
 
 #endif /* threads/thread.h */
