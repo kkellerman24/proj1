@@ -103,7 +103,7 @@ timer_sleep (int64_t ticks)
   */
   
   // NEW CODE
-  ASSERT (intr_get_level () == INTR_ON)
+  ASSERT (intr_get_level () == INTR_ON);
   enum intr_level old_level = intr_disable();
   struct thread *cur = thread_current();
   cur->wake_time = timer_ticks() + ticks;
@@ -204,9 +204,10 @@ wake_threads(void)
 	{
 		struct thread *t = list_entry(index, struct thread, elem);
 		if (t->wake_time > ticks)
-			return;
+			break;
 		list_remove(index);
 		thread_unblock(t);
+		index = list_begin(&sleep_list);
 	}
 }
 
@@ -281,11 +282,3 @@ real_time_delay (int64_t num, int32_t denom)
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
 
-// NEW CODE
-bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
-{
-	struct thread *thread_a = list_entry(a, struct thread, elem);
-	struct thread *thread_b = list_entry(b, struct thread, elem);
-	
-	return thread_a->wake_time < thread_b->wake_time;
-}
