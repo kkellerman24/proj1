@@ -89,8 +89,29 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+	
+	
+	
 	// NEW CODE
+	/********************** Alarm clock ***************************/
 	int64_t wake_time;					/* keeps track of time, based on ticks, till the thread should be awoken */
+	/**************************************************************/
+	
+	/********************** Priority Scheduling *******************/
+	
+	/* To restore priority to the old form after a donation */
+    int old_priority; 
+    
+	/* Determine the lock the thread is waiting for */
+    struct lock * wait_lock;
+
+	/* list of possible donor threads */
+    struct list donors_list; 
+  
+    struct list_elem donor_elem; //Could we just use elem instead of making a new list element????? 
+	
+	/*************************************************************/
+	
 	// END NEW CODE
 	
     /* Shared between thread.c and synch.c. */
