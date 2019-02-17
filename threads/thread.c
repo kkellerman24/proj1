@@ -134,9 +134,12 @@ thread_tick (void)
   else
     kernel_ticks++;
 
-  /* Enforce preemption. */
+  // NEW CODE
+  /* Enforce preemption. 
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  */
+  // END NEW CODE
 }
 
 /* Prints thread statistics. */
@@ -200,6 +203,16 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  
+  
+  enum intr_level old_level = intr_disable();
+  // yield processor if priority is less than others that are ready
+  
+  /* struct thread *head = list_entry(list_front(&ready_list), struct thread, elem);
+  if(thread_current()->priority < head->priority)
+	thread_yield(); */
+  check_priority();
+  intr_set_level(old_level);
 
   return tid;
 }
@@ -231,18 +244,30 @@ thread_block (void)
    update other data. */
 void
 thread_unblock (struct thread *t) 
-{  
-  // NEW CODE
-  /* Turn off interrupts temporarily */
-  /* Inserting our unblocked thread into the ready list so it may now be used to execute */
-  enum intr_level old_level; 
+{
+  /*
+  enum intr_level old_level;
+
   ASSERT (is_thread (t));
-  old_level = intr_disable(); 
+
+  old_level = intr_disable ();
+  ASSERT (t->status == THREAD_BLOCKED);
+  list_push_back (&ready_list, &t->elem);
+  t->status = THREAD_READY;
+  intr_set_level (old_level);
+  */
+  
+  // NEW CODE
+  enum intr_level old_level;
+  // thread_print_stats();
+  ASSERT (is_thread (t));
+  old_level = intr_disable();
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered(&ready_list, &t->elem, (list_less_func *) &is_greater_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
   // END NEW CODE
+  
 }
 
 /* Returns the name of the running thread. */
@@ -311,14 +336,10 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-  {
 	  // NEW CODE
-      /* Inserting our unblocked thread into the ready list so it may now be used to execute */
 	  list_insert_ordered(&ready_list, &cur->elem, (list_less_func *) &is_greater_priority, NULL);
-	  //list_push_back (&ready_list, &cur->elem);
-	  // END NEW CODE
-  }
-	  
+    //list_push_back (&ready_list, &cur->elem);
+	// END NEW CODE
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -345,16 +366,23 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  enum intr_level old_level = intr_disable();
   // thread_current ()->priority = new_priority;
   struct thread *cur = thread_current();
-  cur->priority = new_priority;
-  if (list_empty (&ready_list))
-     return;
-
-  struct list_elem *front_elem = list_front(&ready_list);
-  struct thread *front_ready_thread = list_entry(front_elem, struct thread, elem);
-  if (front_ready_thread->priority > cur->priority)
-	  thread_yield();
+  int old_priority = cur->priority;
+  cur->old_priority = new_priority;
+  update_priority();
+  if(old_priority < cur->priority)
+	  donate_priority();
+  else if(old_priority > cur->priority)
+  {
+	  // yield processor if new priority is less than others
+	  check_priority();
+	  /*struct thread *head = list_entry(list_front(&ready_list), struct thread, elem);
+	  if(cur->priority < head->priority)
+		  thread_yield();*/
+  }
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -486,6 +514,11 @@ init_thread (struct thread *t, const char *name, int priority)
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
+  
+  // initializing priority donation members
+  list_init(&t->donors_list);
+  t->old_priority = priority;
+  t->wait_lock = NULL;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -605,7 +638,6 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 // NEW CODE
-/* This is a helper function for determining priority in a list */
 bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
 	struct thread *thread_a = list_entry(a, struct thread, elem);
@@ -613,10 +645,8 @@ bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, 
 	
 	return thread_a->priority > thread_b->priority;
 }
-// END NEW CODE
 
 // NEW CODE
-/* This is a helper function for ordering our sleep list based on wake time */
 bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
 	struct thread *thread_a = list_entry(a, struct thread, elem);
@@ -624,5 +654,58 @@ bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, vo
 	
 	return thread_a->wake_time < thread_b->wake_time;
 }
-// END NEW CODE
+
+void update_priority(void)
+{
+	struct thread *curr = thread_current();
+	curr->priority = curr->old_priority;
+	// if the current thread has donors
+	if(!list_empty(&curr->donors_list))
+	{
+		struct thread *head_donors_list = list_entry(list_front(&curr->donors_list), struct thread, donor_elem);
+		// only update priority if the donor priority is greater
+		if(head_donors_list->priority > curr->priority)
+			curr->priority = head_donors_list->priority;
+	}
+}
+
+//NEW CODE
+/* Inspired by ryantimwilson, easier logic to pass in lock after checking holder in lock_acquire */
+/* Priority donation makes more sense placed in synch.c */
+
+void
+donate_priority() 
+{	
+	// /* Needed for thread and lock donation iteration 
+	int i = 0;
+	struct thread * curr_t = thread_current();
+	struct lock * curr_l = curr_t->wait_lock;
+	
+	// /* Suggested depth of nested priority donation of 8 
+	while (curr_l != NULL && i != 8) 
+	{
+		// /* If the current thread's priority is less than the thread holding the lock we can't donate the current threads priority 
+		// or if the current lock has no holder
+		//should the following logic implement the empty functions given to us in thread.c????? ie thread_get_priority(), nice etc.
+		if (curr_t->priority <= curr_l->holder->priority || curr_l->holder == NULL) 
+		{
+			return;
+		}
+		curr_l->holder->priority = curr_t->priority; // /* Giving priority, yay! 
+		
+		// /* Continue iterating 
+		curr_t = curr_l->holder;
+		curr_l = curr_l->holder->wait_lock;
+		i++;
+	}
+} 
+
+void check_priority(void)
+{
+  if(list_empty(&ready_list))
+	  return;
+  struct thread *head = list_entry(list_front(&ready_list), struct thread, elem);
+  if(thread_current()->priority < head->priority)
+	thread_yield();
+}
 

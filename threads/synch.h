@@ -40,6 +40,9 @@ void cond_init (struct condition *);
 void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
+// NEW CODE
+bool is_greater_sem_priority (const struct list_elem *, const struct list_elem *, void *);
+// END NEW CODE
 
 /* Optimization barrier.
 

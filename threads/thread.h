@@ -25,13 +25,11 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 /* A kernel thread or user process.
-
    Each thread structure is stored in its own 4 kB page.  The
    thread structure itself sits at the very bottom of the page
    (at offset 0).  The rest of the page is reserved for the
    thread's kernel stack, which grows downward from the top of
    the page (at offset 4 kB).  Here's an illustration:
-
         4 kB +---------------------------------+
              |          kernel stack           |
              |                |                |
@@ -53,22 +51,18 @@ typedef int tid_t;
              |               name              |
              |              status             |
         0 kB +---------------------------------+
-
    The upshot of this is twofold:
-
       1. First, `struct thread' must not be allowed to grow too
          big.  If it does, then there will not be enough room for
          the kernel stack.  Our base `struct thread' is only a
          few bytes in size.  It probably should stay well under 1
          kB.
-
       2. Second, kernel stacks must not be allowed to grow too
          large.  If a stack overflows, it will corrupt the thread
          state.  Thus, kernel functions should not allocate large
          structures or arrays as non-static local variables.  Use
          dynamic allocation with malloc() or palloc_get_page()
          instead.
-
    The first symptom of either of these problems will probably be
    an assertion failure in thread_current(), which checks that
    the `magic' member of the running thread's `struct thread' is
@@ -166,6 +160,9 @@ int thread_get_load_avg (void);
 /* Prototypes for functions that help order our sleeping threads by wake time */
 bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void update_priority (void);
+void donate_priority (void);
+void check_priority (void);
 // END NEW CODE
 
 
