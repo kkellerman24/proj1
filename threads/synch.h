@@ -41,6 +41,7 @@ void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
 // NEW CODE
+/* Prototype for comparing two semaphores based on priority */
 bool is_greater_sem_priority (const struct list_elem *, const struct list_elem *, void *);
 // END NEW CODE
 

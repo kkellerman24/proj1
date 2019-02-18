@@ -92,20 +92,11 @@ struct thread
 	/**************************************************************/
 	
 	/********************** Priority Scheduling *******************/
-	
-	/* To restore priority to the old form after a donation */
-    int old_priority; 
-    
-	/* Determine the lock the thread is waiting for */
-    struct lock * wait_lock;
-
-	/* list of possible donor threads */
-    struct list donors_list; 
-  
-    struct list_elem donor_elem; //Could we just use elem instead of making a new list element????? 
-	
+	int    old_priority;					/* To restore priority to the old form after a donation */
+	struct lock * wait_lock;			/* Determine the lock the thread is waiting for */
+    struct list donors_list; 			/* list of possible donor threads */
+    struct list_elem donor_elem; 		/* list element to add to donors list of the thread which it is donating priority to */
 	/*************************************************************/
-	
 	// END NEW CODE
 	
     /* Shared between thread.c and synch.c. */
@@ -160,6 +151,7 @@ int thread_get_load_avg (void);
 /* Prototypes for functions that help order our sleeping threads by wake time */
 bool is_greater_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 bool is_less_wake_time (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+/* Prototypes for functions that help with priority scheduling */
 void update_priority (void);
 void donate_priority (void);
 void check_priority (void);
